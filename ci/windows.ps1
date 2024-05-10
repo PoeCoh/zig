@@ -27,14 +27,14 @@
 
         PS > winget install Ninja-build.Ninja
 
-        PS > .\ci\windows.ps1 -New -Mode release -Target x86_64 -Build "whatever_current_is"
+        PS > .\ci\windows.ps1 -Mode new -Target x86_64 -Build "whatever_current_is"
             - windows will probably say a bunch of scary things if you haven't
             done this before. It's fine, as always don't run things you don't
             trust.
 #>
 [CmdletBinding()]
 param (
-    [ValidateSet("release", "debug")]
+    [ValidateSet("release", "debug", "new")]
     [string]$Mode = $Env:MODE, # I couldnt think of a better term for it.
     
     [ValidateSet("x86_64", "x86", "aarch64")]
@@ -48,9 +48,7 @@ param (
             return $true
         }
     )]
-    [string]$Build = $Env:BUILD,
-
-    [switch]$New
+    [string]$Build = $Env:BUILD
 )
 
 $ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
@@ -86,9 +84,10 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
 }
 
 Write-Output "Building from source..."
-Remove-Item -Path 'build-release' -Recurse -Force -ErrorAction Ignore
-New-Item -Path 'build-release' -ItemType Directory
-Set-Location -Path 'build-release'
+$Directory = if ($Mode -eq "new") { "build" } else { "build-$MODE" }
+Remove-Item -Path $Directory -Recurse -Force -ErrorAction Ignore
+New-Item -ItemType Directory -Path $Directory
+Set-Location -Path $Directory
 
 # Override the cache directories because they won't actually help other CI runs
 # which will be testing alternate versions of zig, and ultimately would just
@@ -96,28 +95,40 @@ Set-Location -Path 'build-release'
 $Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
 $Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
 
-# CMake gives a syntax error when file paths with backward slashes are used.
-# Here, we use forward slashes only to work around this.
-$Process = Start-Process -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $(
+$ArgList = if ($Mode -eq "new") {$( 
+    ".."
+    "-GNinja"
+    "-DCMAKE_PREFIX_PATH=""$PREFIX_PATH"""
+    "-DCMAKE_C_COMPILER=""$PREFIX_PATH/bin/zig.exe;cc"""
+    "-DCMAKE_CXX_COMPILER=""$PREFIX_PATH/bin/zig.exe;c++"""
+    "-DCMAKE_AR=""$PREFIX_PATH/bin/zig.exe"""
+    "-DZIG_AR_WORKAROUND=ON"
+    "-DZIG_STATIC=ON"
+    "-DZIG_USE_LLVM_CONFIG=OFF"
+)} else {$(
     '..'
     '-GNinja'
     "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
     "-DCMAKE_PREFIX_PATH=""$($PREFIX_PATH -Replace '\\', '/')"""
     "-DCMAKE_BUILD_TYPE=$Mode"
-    "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET;-mcpu=$MCPU"""
-    "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET;-mcpu=$MCPU"""
+    "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
+    "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
     "-DCMAKE_AR=""$ZIG"""
     "-DZIG_AR_WORKAROUND=ON"
     "-DZIG_TARGET_TRIPLE=""$TARGET"""
     "-DZIG_TARGET_MCPU=""$MCPU"""
     "-DZIG_STATIC=ON"
     "-DZIG_NO_LIB=O"
-)
+)}
+
+# CMake gives a syntax error when file paths with backward slashes are used.
+# Here, we use forward slashes only to work around this.
+$Process = Start-Process -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
 $Process = Start-Process -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
-if ($New.IsPresent) {
+if ($Mode -eq "new") {
     # Stop right here, we got all we need for new folks
     Write-Host "Finished building zig"
     return 0
@@ -131,7 +142,6 @@ $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassTh
     "-Dstatic-llvm"
     "-Dskip-non-native"
     "-Denable-symlinks-windows"
-
 )
 $Process | Assert-ExitCode
 
