@@ -9,42 +9,53 @@ concurrency:
   # Cancels pending runs when a PR gets updated.
   group: ${{ github.head_ref || github.run_id }}-${{ github.actor }}
   cancel-in-progress: true
+env:
+  BUILD: "0.13.0-dev.130+98a30acad"
 jobs:
   x86_64-linux-debug:
     timeout-minutes: 420
     runs-on: [self-hosted, Linux, x86_64]
+    env:
+      MODE: "debug"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: sh ci/x86_64-linux-debug.sh
+        run: sh ci/linux.sh
   x86_64-linux-release:
     timeout-minutes: 420
     runs-on: [self-hosted, Linux, x86_64]
+    env:
+      MODE: "release"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: sh ci/x86_64-linux-release.sh
+        run: sh ci/linux.sh
   aarch64-linux-debug:
     timeout-minutes: 480
     runs-on: [self-hosted, Linux, aarch64]
+    env:
+      MODE: "debug"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: sh ci/aarch64-linux-debug.sh
+        run: sh ci/linux.sh
   aarch64-linux-release:
     timeout-minutes: 480
     runs-on: [self-hosted, Linux, aarch64]
+    env:
+      MODE: "release"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: sh ci/aarch64-linux-release.sh
+        run: sh ci/linux.sh
   x86_64-macos-release:
     runs-on: "macos-11"
     env:
+      MODE: "release"
       ARCH: "x86_64"
     steps:
       - name: Checkout
@@ -54,6 +65,7 @@ jobs:
   aarch64-macos-debug:
     runs-on: [self-hosted, macOS, aarch64]
     env:
+      MODE: "debug"
       ARCH: "aarch64"
     steps:
       - name: Checkout
@@ -63,6 +75,7 @@ jobs:
   aarch64-macos-release:
     runs-on: [self-hosted, macOS, aarch64]
     env:
+      MODE: "release"
       ARCH: "aarch64"
     steps:
       - name: Checkout
@@ -74,7 +87,6 @@ jobs:
     env:
       ARCH: "x86_64"
       MODE: "debug"
-      BUILD: "???"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,7 +97,6 @@ jobs:
     env:
       ARCH: "x86_64"
       MODE: "release"
-      BUILD: "???"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,7 +107,6 @@ jobs:
     env:
       ARCH: "aarch64"
       MODE: "release"
-      BUILD: "???"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

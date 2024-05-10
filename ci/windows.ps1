@@ -175,7 +175,7 @@ $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassTh
 )
 $Process | Assert-ExitCode
 
-<# I have not tested past this point, didn't feel like waiting two days for the download #>
+<# I have not tested past this point, didn't feel like waiting two days for vs to download #>
 Import-Module "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
 Assert-ExitCode
 
