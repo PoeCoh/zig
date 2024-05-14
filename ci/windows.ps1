@@ -41,15 +41,14 @@ $Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
 $ZigKit = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
 
-# Write-Host -Object "Starting"
-# if (!(Test-Path -Path "../$ZigKit.zip")) {
+Write-Host -Object "Getting Devkit..."
+if (!(Test-Path -Path "../$ZigKit.zip")) {
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigKit.zip" -OutFile "../$ZigKit.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $ZipDir = (Resolve-Path -Path "../$ZigKit.zip/..").Path
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir\$ZigKit.zip", "$ZipDir\$ZigKit\..")
-    Write-Host -Object $(Get-ChildItem ..).FullName
-# }
+}
 
 
 $Zig = (Resolve-Path -Path "../$ZigKit/bin/zig.exe").Path -replace '\\', '/'
