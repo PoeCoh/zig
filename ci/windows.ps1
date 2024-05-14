@@ -39,25 +39,23 @@ $Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
 }
 
 $ZigBlob = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
+$Devkit = "zig-$Tarball"
 $MCPU = "baseline"
 
-Write-Host -Object "Starting"
+# Write-Host -Object "Starting"
 # if (!(Test-Path -Path "../$ZigBlob.zip")) {
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigBlob.zip" -OutFile "../$ZigBlob.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $ZipDir = (Resolve-Path -Path "../$ZigBlob.zip/..").Path
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
-    Write-Host -Object "ZipDir: $ZipDir"
-    Write-Host -Object $(Get-ChildItem -Path $ZipDir)
-    Write-Host -Object "Target Dir: $ZipDir/$ZigBlob/"
     Remove-Item -Path $ZipDir/$ZigBlob -Recurse -Force -ErrorAction Ignore
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob/..")
+    Remove-Item -Path $ZipDir/$Devkit -Recurse -Force -ErrorAction Ignore
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir\$ZigBlob.zip", "$ZipDir\$Devkit\..")
 # }
 
-Write-Host -Object $(Get-ChildItem -Path ..)
 
-$Zig = (Resolve-Path -Path "../$ZigBlob/bin/zig.exe").Path -replace '\\', '/'
-$Prefix = (Resolve-Path -Path "../$ZigBlob").Path -replace '\\', '/'
+$Zig = (Resolve-Path -Path "../$Devkit/bin/zig.exe").Path -replace '\\', '/'
+$Prefix = (Resolve-Path -Path "../$Devkit").Path -replace '\\', '/'
 
 git fetch --tags
 
@@ -101,9 +99,10 @@ $ArgList = $(
     }
 )
 
-Write-Host "Building from source..."
+Write-Host "Running cmake..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
+Write-Host -Object "Running ninja..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
