@@ -47,9 +47,10 @@ $MCPU = "baseline"
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigBlob.zip" -OutFile "../$ZigBlob.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $ZipDir = (Resolve-Path -Path "../$ZigBlob.zip/..").Path
-    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
+    Remove-Item -Path "C:\Users\ben\actions-runner\_work\zig\zig+llvm+lld+clang-x86_64-windows-gnu-0.13.0-dev.130+98a30acad", "C:\Users\ben\actions-runner\_work\zig\zig+llvm+lld+clang-x86_64-windows-gnu-0.13.0-dev.130+98a30acad.zip" -Force -Recurse -ErrorAction Ignore
     Remove-Item -Path $ZipDir/$ZigBlob -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path $ZipDir/$Devkit -Recurse -Force -ErrorAction Ignore
+    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir\$ZigBlob.zip", "$ZipDir\$Devkit\..")
     Write-Host -Object $(Get-ChildItem ..).FullName
 # }
