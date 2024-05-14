@@ -57,11 +57,12 @@ $ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip
 $PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
 $ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
 $ZIG_LIB_DIR = "$(Get-Location)\lib"
+Write-Host -Object "ZIG_LIB_DIR $ZIG_LIB_DIR"
 
 if (!(Test-Path -Path "$PREFIX_PATH.zip")) {
     Write-Output "Downloading $ZIG_LLVM_CLANG_LLD_URL"
-    Invoke-WebRequest -Uri "$ZIG_LLVM_CLANG_LLD_URL" -OutFile "$PREFIX_PATH.zip"
-    Expand-Archive -Path  "$PREFIX_PATH.zip" -DestinationPath "$PREFIX_PATH\.."
+    Invoke-WebRequest -Uri "$ZIG_LLVM_CLANG_LLD_URL"
+        | Expand-Archive -DestinationPath "$PREFIX_PATH\.."
 }
 
 function Assert-ExitCode {
