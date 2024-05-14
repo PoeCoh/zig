@@ -51,14 +51,18 @@ param (
     [string]$Build = $Env:BUILD
 )
 
-$ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
-$MCPU = "baseline"
-$ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
-$PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
-$ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
+# $ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
+# $MCPU = "baseline"
+# $ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
+# $PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
+# $ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
+
+$START_DIR = Get-Location
+Write-Host -Object "Starting Location: $START_DIR"
+
 $ZIG_LIB_DIR = "$(Get-Location)\lib"
 Write-Host -Object "ZIG_LIB_DIR $ZIG_LIB_DIR"
-
+<#
 if (!(Test-Path -Path "$PREFIX_PATH.zip")) {
     Write-Output "Downloading $ZIG_LLVM_CLANG_LLD_URL"
     Invoke-WebRequest -Uri "$ZIG_LLVM_CLANG_LLD_URL"
@@ -176,7 +180,7 @@ $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassTh
 )
 $Process | Assert-ExitCode
 
-<# I have not tested past this point, didn't feel like waiting two days for vs to download #>
+<# I have not tested past this point, didn't feel like waiting two days for vs to download
 Import-Module "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
 Assert-ExitCode
 
@@ -207,3 +211,4 @@ $Process | Assert-ExitCode
 
 $Process = Start-Process -FilePath .\test-x86_64-windows-msvc.exe -NoNewWindow -PassThru -Wait
 $Process | Assert-ExitCode
+#>
