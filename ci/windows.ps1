@@ -39,7 +39,7 @@ $DevKit = "$Env:TEMP\$ZigLlvmLldClang"
 $Zig = "$DevKit/bin/zig.exe" -replace '\\', '/'
 if (!(Test-Path -Path "$DevKit.zip")) {
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigLlvmLldClang.zip" -OutFile "$DevKit.zip"
-    Expand-Archive -Path "$DevKit.zip" -DestinationPath $DevKit
+    Expand-Archive -Path "$DevKit.zip" -DestinationPath .\
 }
 
 git fetch --tags
