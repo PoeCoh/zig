@@ -42,14 +42,14 @@ $ZigBlob = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
 
 Write-Host -Object "Starting"
-if (!(Test-Path -Path "../$ZigBlob.zip")) {
+# if (!(Test-Path -Path "../$ZigBlob.zip")) {
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigBlob.zip" -OutFile "../$ZigBlob.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $ZipDir = (Resolve-Path -Path "../$ZigBlob.zip/..").Path
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("../$ZibBlob.zip", "../$ZigBlob")
-}
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob")
+# }
 
-Get-ChildItem -Path ../
 $Zig = (Resolve-Path -Path "../$ZigBlob/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigBlob").Path -replace '\\', '/'
 
