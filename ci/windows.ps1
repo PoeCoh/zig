@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
-    [Parameter()]
-    [switch]$New,
+    [Parameter(ParameterSetName="Stage3")]
+    [switch]$Stage3,
 
     [ValidateSet("release", "debug")]
     [string]$Mode = $(if ($Env:MODE) { $Env:MODE } else { "release" })
@@ -21,9 +21,9 @@ function Assert-ExitCode {
     exit 1
 }
 
-function Clang-Path {
-    param ([string]$Path)
-    $(Resolve-Path -Path $Path).Path -replace "\\", "/"
+if (-not $Stage3.IsPresent) {
+    $Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
+    $Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
 }
 
 $Target = switch ($Env:PROCESSOR_ARCHITECTURE) {
@@ -50,7 +50,6 @@ if (!(Test-Path -Path "../$ZigKit.zip")) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir\$ZigKit.zip", "$ZipDir\$ZigKit\..")
 }
 
-
 $Zig = (Resolve-Path -Path "../$ZigKit/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigKit").Path -replace '\\', '/'
 
@@ -60,8 +59,7 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
-
-$Build = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
+$Build = if ($Stage3.IsPresent) { "build" } else { "build-$Mode" }
 if (Test-Path -Path $Build) { Remove-Item -Path $Build -Recurse -Force }
 New-Item -Path $Build -ItemType Directory
 
@@ -72,55 +70,40 @@ $ArgList = $(
     "-DZIG_STATIC=ON"
     "-DZIG_NO_LIB=ON"
     "-DCMAKE_PREFIX_PATH=""$Prefix"""
+    "-DCMAKE_BUILD_TYPE=$Mode"
+    "-DCMAKE_AR=""$Zig"""
 ) + $(
-    if ($New.IsPresent) {
+    if ($Stage3.IsPresent) {
         $(
             "-DCMAKE_C_COMPILER=""$Zig;cc"""
-            "-DCMAKE_CXX_COMPILER=""%DEVKIT%/bin/zig.exe;c++"""
-            "-DCMAKE_AR=""%DEVKIT%/bin/zig.exe"""
+            "-DCMAKE_CXX_COMPILER=""$Zig;c++"""
+            "-DCMAKE_AR=""$Zig"""
             "-DZIG_STATIC=ON"
             "-DZIG_USE_LLVM_CONFIG=OFF"
-            "-DCMAKE_BUILD_TYPE=Release"
         )
     }
     else {
         $(
             "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-            "-DCMAKE_BUILD_TYPE=$Mode"
             "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target-windows-gnu;-mcpu=$MCPU"""
             "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target-windows-gnu;-mcpu=$MCPU"""
-            "-DCMAKE_AR=""$Zig"""
             "-DZIG_TARGET_TRIPLE=""$Target-windows-gnu"""
             "-DZIG_TARGET_MCPU=""$MCPU"""
         )
     }
 )
 
-Write-Host "Running cmake..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
-Write-Host -Object "Running ninja..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
-# Override the cache directories because they won't actually help other CI runs
-# which will be testing alternate versions of zig, and ultimately would just
-# fill up space on the hard drive for no reason.
-$Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
-$Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
-
-# CMake gives a syntax error when file paths with backward slashes are used.
-# Here, we use forward slashes only to work around this.
-# $Process = Start-Process -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
-# $Process | Assert-ExitCode
-# $Process = Start-Process -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
-# $Process | Assert-ExitCode
-
-if ($New.IsPresent) {
+if ($Stage3.IsPresent) {
     # Stop right here, we got all we need for new folks
     Write-Host "Finished building zig"
     return 0
 }
+
 <#
 Write-Output "Main test suite..."
 $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassThru -Wait -ArgumentList $(
