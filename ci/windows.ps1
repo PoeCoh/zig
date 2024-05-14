@@ -89,8 +89,10 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
 }
 
 $BuildDirectory = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
-Remove-Item -Path $BUildDirectory -Recurse -Force
-New-Item -Path $Directory -ItemType Directory
+if (Test-Path -Path $BuildDirectory) {
+    Remove-Item -Path $BuildDirectory -Recurse -Force
+}
+New-Item -Path $BuildDirectory -ItemType Directory
 
 $ArgList = if ($Mode -eq "new") {$(
     ".."
