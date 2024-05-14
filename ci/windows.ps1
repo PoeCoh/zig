@@ -54,12 +54,12 @@ param (
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
-trap {
-    # This will catch any terminating error
-    if ($ZipFile -and (Test-Path -Path $Env:TEMP\$ZipFile)) {
-        Remove-Item -Path $Env:TEMP\$ZipFile -Recurse -Force
-    }
-}
+# trap {
+#     # This will catch any terminating error
+#     if ($Devkit -and (Test-Path -Path "$DevKit.zip")) {
+#         Remove-Item -Path "$DevKit.zip" -Recurse -Force
+#     }
+# }
 
 function Assert-ExitCode {
     [CmdletBinding()]
@@ -72,18 +72,7 @@ function Assert-ExitCode {
     exit 1
 }
 
-$ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
 $MCPU = "baseline"
-$ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
-$PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
-# $ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
-
-
-
-
-$LibDir = "$(Get-Location)\lib"
-Write-Host -Object "LIB DIR $LIBDIR"
-
 
 $ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
 $DevKit = "$Env:TEMP\$ZigLlvmLldClang"
@@ -102,9 +91,6 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
 $BuildDirectory = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
 Remove-Item -Path $BUildDirectory -Recurse -Force
 New-Item -Path $Directory -ItemType Directory
-
-$LocalCache = "$Env:Temp\zig-local-cache"
-$GlobalCache = "$Env:TEMP\zig-global-cache"
 
 $ArgList = if ($Mode -eq "new") {$(
     ".."
