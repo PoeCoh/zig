@@ -36,7 +36,7 @@ $MCPU = "baseline"
 Write-Host -Object "Starting"
 $ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
 $DevKit = "$Env:TEMP\$ZigLlvmLldClang"
-$Zig = "$DevKit/binzig.exe" -replace '\\', '/'
+$Zig = "$DevKit/bin/zig.exe" -replace '\\', '/'
 if (!(Test-Path -Path "$DevKit.zip")) {
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigLlvmLldClang.zip" -OutFile "$DevKit.zip"
     Expand-Archive -Path "$DevKit.zip" -DestinationPath $DevKit
@@ -62,6 +62,7 @@ $ArgList.Add("-GNinja")
 $ArgList.Add("-DCMAKE_PREFIX_PATH=""$DevKit""")
 $ArgList.Add("-DZIG_AR_WORKAROUND=ON")
 $ArgList.Add("-DZIG_STATIC=ON")
+$ArgList.Add("-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU""")
 # $ArgList = if ($Mode -eq "new") {
 #     $(
 #         "-DCMAKE_C_COMPILER=""$DevKit/bin/zig.exe;cc"""
