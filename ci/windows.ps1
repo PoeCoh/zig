@@ -76,20 +76,21 @@ $ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
 $MCPU = "baseline"
 $ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
 $PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
-$ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
+# $ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
 
 
-$ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
-$ZipFile = "$ZigLlvmLldClang.zip"
-$Url = "https://ziglang.org/deps/$ZipFile"
 
 
 $LibDir = "$(Get-Location)\lib"
 Write-Host -Object "LIB DIR $LIBDIR"
 
 
-if (!(Test-Path -Path "$Env:TEMP\$ZigLlvmLldClang.zip")) {
-    Invoke-WebRequest -Uri $Url | Expand-Archive -DestinationPath $Env:TEMP\$ZigLlvmLldClang
+$ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
+$DevKit = "$Env:TEMP\$ZigLlvmLldClang"
+$Zig = "$DevKit/binzig.exe" -replace '\\', '/'
+if (!(Test-Path -Path "$DevKit.zip")) {
+    Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigLlvmLldClang.zip" -OutFile "$DevKit.zip"
+    Expand-Archive -Path "$DevKit.zip" -DestinationPath $DevKit
 }
 
 git fetch --tags
