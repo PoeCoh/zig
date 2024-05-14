@@ -56,40 +56,37 @@ if (Test-Path -Path $BuildDirectory) {
 New-Item -Path $BuildDirectory -ItemType Directory
 
 Write-Host -Object "Args"
-$ArgList = if ($Mode -eq "new") {
-    $(
-        ".."
-        "-GNinja"
-        "-DCMAKE_PREFIX_PATH=""$Env:TEMP/$ZigLlvmLldClang"""
-        "-DCMAKE_C_COMPILER=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe;cc"""
-        "-DCMAKE_CXX_COMPILER=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe;c++"""
-        "-DCMAKE_AR=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe"""
-        "-DZIG_AR_WORKAROUND=ON"
-        "-DZIG_STATIC=ON"
-        "-DZIG_USE_LLVM_CONFIG=OFF"
-    )
-} else {
-    $(
-        '..'
-        '-GNinja'
-        "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-        
-        "-DCMAKE_PREFIX_PATH=""$($Env:TEMP/$ZigLlvmLldClang -Replace '\\', '/')"""
-        "-DCMAKE_BUILD_TYPE=$Mode"
-        "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
-        # "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
-        # "-DCMAKE_AR=""$ZIG"""
-        # "-DZIG_AR_WORKAROUND=ON"
-        # "-DZIG_TARGET_TRIPLE=""$TARGET"""
-        # "-DZIG_TARGET_MCPU=""$MCPU"""
-        # "-DZIG_STATIC=ON"
-        # "-DZIG_NO_LIB=O"
-    )
-}
+$ArgList = [System.Collections.Generic.List[string]]::new()
+$ArgList.Add("..")
+$ArgList.Add("-GNinja")
+$ArgList.Add("-DCMAKE_PREFIX_PATH=""$DevKit""")
+# $ArgList = if ($Mode -eq "new") {
+#     $(
+#         "-DCMAKE_C_COMPILER=""$DevKit/bin/zig.exe;cc"""
+#         "-DCMAKE_CXX_COMPILER=""$DevKit/bin/zig.exe;c++"""
+#         "-DCMAKE_AR=""$DevKit/bin/zig.exe"""
+#         "-DZIG_AR_WORKAROUND=ON"
+#         "-DZIG_STATIC=ON"
+#         "-DZIG_USE_LLVM_CONFIG=OFF"
+#     )
+# } else {
+#     $(
+#         "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
+#         "-DCMAKE_BUILD_TYPE=$Mode"
+#         "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
+#         # "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
+#         # "-DCMAKE_AR=""$ZIG"""
+#         # "-DZIG_AR_WORKAROUND=ON"
+#         # "-DZIG_TARGET_TRIPLE=""$TARGET"""
+#         # "-DZIG_TARGET_MCPU=""$MCPU"""
+#         # "-DZIG_STATIC=ON"
+#         # "-DZIG_NO_LIB=O"
+#     )
+# }
 Write-Host -Object "Args done"
 
 Write-Host "Building from source..."
-$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
+$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList.ToArray()
 $Process | Assert-ExitCode
 $Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
