@@ -50,6 +50,8 @@ Write-Host -Object "Starting"
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob")
 # }
 
+Write-Host -Object $(Get-ChildItem -Path ..)
+
 $Zig = (Resolve-Path -Path "../$ZigBlob/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigBlob").Path -replace '\\', '/'
 
