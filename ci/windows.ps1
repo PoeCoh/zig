@@ -51,22 +51,14 @@ param (
     [string]$Build = $Env:BUILD
 )
 
-# $ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
-# $MCPU = "baseline"
-# $ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
-# $PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
-# $ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
+Set-StrictMode -Version 3.0
+$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
-$START_DIR = Get-Location
-Write-Host -Object "Starting Location: $START_DIR"
-
-$ZIG_LIB_DIR = "$(Get-Location)\lib"
-Write-Host -Object "ZIG_LIB_DIR $ZIG_LIB_DIR"
-<#
-if (!(Test-Path -Path "$PREFIX_PATH.zip")) {
-    Write-Output "Downloading $ZIG_LLVM_CLANG_LLD_URL"
-    Invoke-WebRequest -Uri "$ZIG_LLVM_CLANG_LLD_URL"
-        | Expand-Archive -DestinationPath "$PREFIX_PATH\.."
+trap {
+    # This will catch any terminating error
+    if ($ZipFile -and (Test-Path -Path $Env:TEMP\$ZipFile)) {
+        Remove-Item -Path $Env:TEMP\$ZipFile -Recurse -Force
+    }
 }
 
 function Assert-ExitCode {
@@ -80,33 +72,46 @@ function Assert-ExitCode {
     exit 1
 }
 
-# Make the `zig version` number consistent.
-# This will affect the `zig build` command below which uses `git describe`.
+$ZIG_LLVM_CLANG_LLD_NAME = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
+$MCPU = "baseline"
+$ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
+$PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
+$ZIG = "$PREFIX_PATH\bin\zig.exe" -replace '\\', '/'
+
+
+$ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
+$ZipFile = "$ZigLlvmLldClang.zip"
+$Url = "https://ziglang.org/deps/$ZipFile"
+
+
+$LibDir = "$(Get-Location)\lib"
+Write-Host -Object "LIB DIR $LIBDIR"
+
+
+if (!(Test-Path -Path "$Env:TEMP\$ZigLlvmLldClang.zip")) {
+    Invoke-WebRequest -Uri $Url | Expand-Archive -DestinationPath $Env:TEMP\$ZigLlvmLldClang
+}
+
 git fetch --tags
 
 if ((git rev-parse --is-shallow-repository) -eq "true") {
-    git fetch --unshallow # `git describe` won't work on a shallow repo
+    git fetch --unshallow
 }
 
-Write-Output "Building from source..."
-$Directory = if ($Mode -eq "new") { "build" } else { "build-$MODE" }
-Remove-Item -Path $Directory -Recurse -Force -ErrorAction Ignore
-New-Item -ItemType Directory -Path $Directory
-Set-Location -Path $Directory
+$BuildDirectory = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
+Remove-Item -Path $BUildDirectory -Recurse -Force
+New-Item -Path $Directory -ItemType Directory
 
-# Override the cache directories because they won't actually help other CI runs
-# which will be testing alternate versions of zig, and ultimately would just
-# fill up space on the hard drive for no reason.
-$Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
-$Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
+$LocalCache = "$Env:Temp\zig-local-cache"
+$GlobalCache = "$Env:TEMP\zig-global-cache"
 
-$ArgList = if ($Mode -eq "new") {$( 
+$ArgList = if ($Mode -eq "new") {$(
     ".."
     "-GNinja"
-    "-DCMAKE_PREFIX_PATH=""$PREFIX_PATH"""
-    "-DCMAKE_C_COMPILER=""$PREFIX_PATH/bin/zig.exe;cc"""
-    "-DCMAKE_CXX_COMPILER=""$PREFIX_PATH/bin/zig.exe;c++"""
-    "-DCMAKE_AR=""$PREFIX_PATH/bin/zig.exe"""
+    "-DCMAKE_PREFIX_PATH=""$Env:TEMP/$ZigLlvmLldClang"""
+    "-DCMAKE_C_COMPILER=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe;cc"""
+    "-DCMAKE_CXX_COMPILER=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe;c++"""
+    "-DCMAKE_AR=""$Env:TEMP/$ZigLlvmLldClang/bin/zig.exe"""
     "-DZIG_AR_WORKAROUND=ON"
     "-DZIG_STATIC=ON"
     "-DZIG_USE_LLVM_CONFIG=OFF"
@@ -114,7 +119,7 @@ $ArgList = if ($Mode -eq "new") {$(
     '..'
     '-GNinja'
     "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-    "-DCMAKE_PREFIX_PATH=""$($PREFIX_PATH -Replace '\\', '/')"""
+    "-DCMAKE_PREFIX_PATH=""$($Env:TEMP/$ZigLlvmLldClang -Replace '\\', '/')"""
     "-DCMAKE_BUILD_TYPE=$Mode"
     "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
     "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
@@ -126,19 +131,31 @@ $ArgList = if ($Mode -eq "new") {$(
     "-DZIG_NO_LIB=O"
 )}
 
+Write-Output "Building from source..."
+$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
+$Process | Assert-ExitCode
+$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
+$Process | Assert-ExitCode
+
+# Override the cache directories because they won't actually help other CI runs
+# which will be testing alternate versions of zig, and ultimately would just
+# fill up space on the hard drive for no reason.
+$Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
+$Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
+
 # CMake gives a syntax error when file paths with backward slashes are used.
 # Here, we use forward slashes only to work around this.
-$Process = Start-Process -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
-$Process | Assert-ExitCode
-$Process = Start-Process -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
-$Process | Assert-ExitCode
+# $Process = Start-Process -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
+# $Process | Assert-ExitCode
+# $Process = Start-Process -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
+# $Process | Assert-ExitCode
 
 if ($Mode -eq "new") {
     # Stop right here, we got all we need for new folks
     Write-Host "Finished building zig"
     return 0
 }
-
+<#
 Write-Output "Main test suite..."
 $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassThru -Wait -ArgumentList $(
     "build test docs"
