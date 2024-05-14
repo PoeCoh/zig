@@ -60,13 +60,13 @@ $ArgList = [System.Collections.Generic.List[string]]::new()
 $ArgList.Add("..")
 $ArgList.Add("-GNinja")
 $ArgList.Add("-DCMAKE_PREFIX_PATH=""$DevKit""")
+$ArgList.Add("-DZIG_AR_WORKAROUND=ON")
+$ArgList.Add("-DZIG_STATIC=ON")
 # $ArgList = if ($Mode -eq "new") {
 #     $(
 #         "-DCMAKE_C_COMPILER=""$DevKit/bin/zig.exe;cc"""
 #         "-DCMAKE_CXX_COMPILER=""$DevKit/bin/zig.exe;c++"""
 #         "-DCMAKE_AR=""$DevKit/bin/zig.exe"""
-#         "-DZIG_AR_WORKAROUND=ON"
-#         "-DZIG_STATIC=ON"
 #         "-DZIG_USE_LLVM_CONFIG=OFF"
 #     )
 # } else {
@@ -76,10 +76,8 @@ $ArgList.Add("-DCMAKE_PREFIX_PATH=""$DevKit""")
 #         "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
 #         # "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
 #         # "-DCMAKE_AR=""$ZIG"""
-#         # "-DZIG_AR_WORKAROUND=ON"
 #         # "-DZIG_TARGET_TRIPLE=""$TARGET"""
 #         # "-DZIG_TARGET_MCPU=""$MCPU"""
-#         # "-DZIG_STATIC=ON"
 #         # "-DZIG_NO_LIB=O"
 #     )
 # }
