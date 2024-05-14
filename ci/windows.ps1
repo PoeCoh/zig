@@ -55,7 +55,7 @@ if (Test-Path -Path $BuildDirectory) {
 }
 New-Item -Path $BuildDirectory -ItemType Directory
 
-Write-Host -Object "BUIld Project"
+Write-Host -Object "Args"
 $ArgList = if ($Mode -eq "new") {$(
     ".."
     "-GNinja"
@@ -81,6 +81,7 @@ $ArgList = if ($Mode -eq "new") {$(
     "-DZIG_STATIC=ON"
     "-DZIG_NO_LIB=O"
 )}
+Write-Host -Object "Args done"
 
 Write-Output "Building from source..."
 $Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
