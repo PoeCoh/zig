@@ -87,10 +87,10 @@ $ArgList = $(
         $(
             "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
             "-DCMAKE_BUILD_TYPE=$Mode"
-            "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target;-mcpu=$MCPU"""
-            "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target;-mcpu=$MCPU"""
+            "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target-windows-gnu-;-mcpu=$MCPU"""
+            "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target-windows-gnu-;-mcpu=$MCPU"""
             "-DCMAKE_AR=""$Zig"""
-            "-DZIG_TARGET_TRIPLE=""$Target"""
+            "-DZIG_TARGET_TRIPLE=""$Target-windows-gnu-"""
             "-DZIG_TARGET_MCPU=""$MCPU"""
         )
     }
