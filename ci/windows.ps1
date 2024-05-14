@@ -47,7 +47,10 @@ Write-Host -Object "Starting"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $ZipDir = (Resolve-Path -Path "../$ZigBlob.zip/..").Path
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob")
+    Write-Host -Object "ZipDir: $ZipDir"
+    Write-Host -Object $(Get-ChildItem -Path $ZipDir)
+    Write-Host -Object "Target Dir: $ZipDir/$ZigBlob/"
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob/..")
 # }
 
 Write-Host -Object $(Get-ChildItem -Path ..)
