@@ -73,9 +73,10 @@ $ArgList = if ($Mode -eq "new") {
         '..'
         '-GNinja'
         "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-        # "-DCMAKE_PREFIX_PATH=""$($Env:TEMP/$ZigLlvmLldClang -Replace '\\', '/')"""
-        # "-DCMAKE_BUILD_TYPE=$Mode"
-        # "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
+        
+        "-DCMAKE_PREFIX_PATH=""$($Env:TEMP/$ZigLlvmLldClang -Replace '\\', '/')"""
+        "-DCMAKE_BUILD_TYPE=$Mode"
+        "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
         # "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
         # "-DCMAKE_AR=""$ZIG"""
         # "-DZIG_AR_WORKAROUND=ON"
