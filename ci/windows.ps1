@@ -49,6 +49,7 @@ if (!(Test-Path -Path "../$ZigBlob.zip")) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory("../$ZibBlob.zip", "../$ZigBlob")
 }
 
+Get-ChildItem -Path ../
 $Zig = (Resolve-Path -Path "../$ZigBlob/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigBlob").Path -replace '\\', '/'
 
@@ -58,7 +59,6 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
-Get-ChildItem -Path ../
 
 $Build = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
 if (Test-Path -Path $Build) { Remove-Item -Path $Build -Recurse -Force }
