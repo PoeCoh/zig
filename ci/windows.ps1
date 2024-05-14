@@ -21,6 +21,11 @@ function Assert-ExitCode {
     exit 1
 }
 
+function Clang-Path {
+    param ([string]$Path)
+    $(Resolve-Path -Path $Path).Path -replace "\\", "/"
+}
+
 $Target = switch ($Env:PROCESSOR_ARCHITECTURE) {
     "AMD64" { "x86_64" }
     "ARM64" { "aarch64" }
@@ -35,7 +40,6 @@ $Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
 
 $ZigBlob = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
-$Zig = "../$ZigBlob/bin/zig.exe" -replace '\\', '/'
 
 Write-Host -Object "Starting"
 if (!(Test-Path -Path "../$ZigBlob.zip")) {
@@ -45,16 +49,19 @@ if (!(Test-Path -Path "../$ZigBlob.zip")) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory("../$ZibBlob.zip", "../$ZigBlob")
 }
 
+$Zig = (Resolve-Path -Path "../$ZigBlob/bin/zig.exe").Path -replace '\\', '/'
+$Prefix = (Resolve-Path -Path "../$ZigBlob").Path -replace '\\', '/'
+
 git fetch --tags
 
 if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
+Get-ChildItem -Path ../
+
 $Build = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
-if (Test-Path -Path $Build) {
-    Remove-Item -Path $Build -Recurse -Force
-}
+if (Test-Path -Path $Build) { Remove-Item -Path $Build -Recurse -Force }
 New-Item -Path $Build -ItemType Directory
 
 $ArgList = $(
@@ -63,11 +70,11 @@ $ArgList = $(
     "-DZIG_AR_WORKAROUND=ON"
     "-DZIG_STATIC=ON"
     "-DZIG_NO_LIB=ON"
-    "-DCMAKE_PREFIX_PATH=""../$ZigBlob"""
+    "-DCMAKE_PREFIX_PATH=""$Prefix"""
 ) + $(
     if ($New.IsPresent) {
         $(
-            "-DCMAKE_C_COMPILER=""%DEVKIT%/bin/zig.exe;cc"""
+            "-DCMAKE_C_COMPILER=""$Zig;cc"""
             "-DCMAKE_CXX_COMPILER=""%DEVKIT%/bin/zig.exe;c++"""
             "-DCMAKE_AR=""%DEVKIT%/bin/zig.exe"""
             "-DZIG_STATIC=ON"
@@ -77,7 +84,7 @@ $ArgList = $(
     }
     else {
         $(
-            "-DCMAKE_INSTALL_PREFIX=""stage3-release"""
+            "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
             "-DCMAKE_BUILD_TYPE=$Mode"
             "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target;-mcpu=$MCPU"""
             "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target;-mcpu=$MCPU"""
