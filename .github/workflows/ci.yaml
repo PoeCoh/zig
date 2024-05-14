@@ -10,7 +10,7 @@ concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.actor }}
   cancel-in-progress: true
 env:
-  BUILD: "0.13.0-dev.130+98a30acad"
+  TARBALL: "0.13.0-dev.130+98a30acad"
 jobs:
   # x86_64-linux-debug:
   #   timeout-minutes: 420
@@ -85,7 +85,6 @@ jobs:
   x86_64-windows-debug:
     runs-on: [self-hosted, Windows, x86_64]
     env:
-      ARCH: "x86_64"
       MODE: "debug"
     steps:
       - name: Checkout
@@ -95,7 +94,6 @@ jobs:
   x86_64-windows-release:
     runs-on: [self-hosted, Windows, x86_64]
     env:
-      ARCH: "x86_64"
       MODE: "release"
     steps:
       - name: Checkout
@@ -105,7 +103,6 @@ jobs:
   # aarch64-windows:
   #   runs-on: [self-hosted, Windows, aarch64]
   #   env:
-  #     ARCH: "aarch64"
   #     MODE: "release"
   #   steps:
   #     - name: Checkout

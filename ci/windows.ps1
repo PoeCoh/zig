@@ -1,20 +1,10 @@
 [CmdletBinding()]
 param (
-    [ValidateSet("release", "debug", "new")]
-    [string]$Mode = $Env:MODE, # I couldnt think of a better term for it.
-    
-    [ValidateSet("x86_64", "x86", "aarch64")]
-    [string]$Target = $Env:ARCH,
-    
-    [ValidateScript(
-        {
-            if ([string]::IsNullOrWhiteSpace($_)) {
-                throw "Build version cannot be null, empty, or whitespace"
-            }
-            return $true
-        }
-    )]
-    [string]$Build = $Env:BUILD
+    [Parameter()]
+    [switch]$New,
+
+    [ValidateSet("release", "debug")]
+    [string]$Mode = $(if ($Env:MODE) { $Env:MODE } else { "release" })
 )
 
 Set-StrictMode -Version 3.0
@@ -31,15 +21,28 @@ function Assert-ExitCode {
     exit 1
 }
 
+$Target = switch ($Env:PROCESSOR_ARCHITECTURE) {
+    "AMD64" { "x86_64" }
+    "ARM64" { "aarch64" }
+    default { throw "Unknown architecture" }
+}
+
+$Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
+    $Content = Get-Content .\.github\workflows\ci.yaml
+    | Select-String -Pattern "TARBALL: ""(.+)"""
+    $Content.Matches.Groups[1].Value
+}
+
+$ZigBlob = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
+$Zig = "../$ZigBlob/bin/zig.exe" -replace '\\', '/'
 
 Write-Host -Object "Starting"
-$ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
-$DevKit = "$Env:TEMP\$ZigLlvmLldClang"
-$Zig = "$DevKit/bin/zig.exe" -replace '\\', '/'
-if (!(Test-Path -Path "$DevKit.zip")) {
-    Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigLlvmLldClang.zip" -OutFile "$DevKit.zip"
-    Expand-Archive -Path "$DevKit.zip" -DestinationPath .\
+if (!(Test-Path -Path "../$ZigBlob.zip")) {
+    Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigBlob.zip" -OutFile "../$ZigBlob.zip"
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("../$ZibBlob.zip", "../$ZigBlob")
 }
 
 git fetch --tags
@@ -48,46 +51,47 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
-Write-Host -Object "Build Dir"
-$BuildDirectory = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
-if (Test-Path -Path $BuildDirectory) {
-    Remove-Item -Path $BuildDirectory -Recurse -Force
+$Build = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
+if (Test-Path -Path $Build) {
+    Remove-Item -Path $Build -Recurse -Force
 }
-New-Item -Path $BuildDirectory -ItemType Directory
+New-Item -Path $Build -ItemType Directory
 
-Write-Host -Object "Args"
-$ArgList = [System.Collections.Generic.List[string]]::new()
-$ArgList.Add("..")
-$ArgList.Add("-GNinja")
-$ArgList.Add("-DCMAKE_PREFIX_PATH=""$DevKit""")
-$ArgList.Add("-DZIG_AR_WORKAROUND=ON")
-$ArgList.Add("-DZIG_STATIC=ON")
-$ArgList.Add("-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU""")
-# $ArgList = if ($Mode -eq "new") {
-#     $(
-#         "-DCMAKE_C_COMPILER=""$DevKit/bin/zig.exe;cc"""
-#         "-DCMAKE_CXX_COMPILER=""$DevKit/bin/zig.exe;c++"""
-#         "-DCMAKE_AR=""$DevKit/bin/zig.exe"""
-#         "-DZIG_USE_LLVM_CONFIG=OFF"
-#     )
-# } else {
-#     $(
-#         "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-#         "-DCMAKE_BUILD_TYPE=$Mode"
-#         "-DCMAKE_C_COMPILER=""$ZIG;cc;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
-#         # "-DCMAKE_CXX_COMPILER=""$ZIG;c++;-target;$TARGET-windows-gnu;-mcpu=$MCPU"""
-#         # "-DCMAKE_AR=""$ZIG"""
-#         # "-DZIG_TARGET_TRIPLE=""$TARGET"""
-#         # "-DZIG_TARGET_MCPU=""$MCPU"""
-#         # "-DZIG_NO_LIB=O"
-#     )
-# }
-Write-Host -Object "Args done"
+$ArgList = $(
+    ".."
+    "-GNinja"
+    "-DZIG_AR_WORKAROUND=ON"
+    "-DZIG_STATIC=ON"
+    "-DZIG_NO_LIB=ON"
+    "-DCMAKE_PREFIX_PATH=""../$ZigBlob"""
+) + $(
+    if ($New.IsPresent) {
+        $(
+            "-DCMAKE_C_COMPILER=""%DEVKIT%/bin/zig.exe;cc"""
+            "-DCMAKE_CXX_COMPILER=""%DEVKIT%/bin/zig.exe;c++"""
+            "-DCMAKE_AR=""%DEVKIT%/bin/zig.exe"""
+            "-DZIG_STATIC=ON"
+            "-DZIG_USE_LLVM_CONFIG=OFF"
+            "-DCMAKE_BUILD_TYPE=Release"
+        )
+    }
+    else {
+        $(
+            "-DCMAKE_INSTALL_PREFIX=""stage3-release"""
+            "-DCMAKE_BUILD_TYPE=$Mode"
+            "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target;-mcpu=$MCPU"""
+            "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target;-mcpu=$MCPU"""
+            "-DCMAKE_AR=""$Zig"""
+            "-DZIG_TARGET_TRIPLE=""$Target"""
+            "-DZIG_TARGET_MCPU=""$MCPU"""
+        )
+    }
+)
 
 Write-Host "Building from source..."
-$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList.ToArray()
+$Process = Start-Process -WorkingDirectory $Build -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
-$Process = Start-Process -WorkingDirectory $BuildDirectory -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
+$Process = Start-Process -WorkingDirectory $Build -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
 # Override the cache directories because they won't actually help other CI runs
@@ -103,7 +107,7 @@ $Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
 # $Process = Start-Process -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 # $Process | Assert-ExitCode
 
-if ($Mode -eq "new") {
+if ($New.IsPresent) {
     # Stop right here, we got all we need for new folks
     Write-Host "Finished building zig"
     return 0
