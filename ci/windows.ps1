@@ -50,6 +50,7 @@ Write-Host -Object "Starting"
     Write-Host -Object "ZipDir: $ZipDir"
     Write-Host -Object $(Get-ChildItem -Path $ZipDir)
     Write-Host -Object "Target Dir: $ZipDir/$ZigBlob/"
+    Remove-Item -Path $ZipDir/$ZigBlob -Recurse -Force -ErrorAction Ignore
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir/$ZigBlob.zip", "$ZipDir/$ZigBlob/..")
 # }
 
