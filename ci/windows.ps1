@@ -1,37 +1,3 @@
-<#
-    This was created with two goals in mind:
-        
-        1: Design it so it never has to be changed between builds, unless the
-        build process itself changes.
-
-        2: Use this as a springboard for new people to build from source. I had
-        a script to automate the process that was very similar and noticed with
-        a few changes this could just about replace the instructions on the
-        getting started page.
-
-    Added environment variables to the ci workflow so changes should be
-    transparent, except for the build id. There is a placeholder for it, but
-    I'll leave it up to someone else for determining how to plug that it.
-        - thoughts from a few hours later:
-            can latest build number be stored in an endpoint somewhere? then
-            users can have a reliable place to look up the build and provide a
-            place for the script to look it up.
-
-    For new people coming in, the majority of the getting started page can be
-    replaced with instructions to install cmake and ninja - which both have
-    managers or installers now - and instructions on how to execute powershell
-    scripts. For those people I'll leave these for convenience:
-
-        https://cmake.org/download/
-            - yes you want to add it to path
-
-        PS > winget install Ninja-build.Ninja
-
-        PS > .\ci\windows.ps1 -Mode new -Target x86_64 -Build "whatever_current_is"
-            - windows will probably say a bunch of scary things if you haven't
-            done this before. It's fine, as always don't run things you don't
-            trust.
-#>
 [CmdletBinding()]
 param (
     [ValidateSet("release", "debug", "new")]
@@ -54,13 +20,6 @@ param (
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
-# trap {
-#     # This will catch any terminating error
-#     if ($Devkit -and (Test-Path -Path "$DevKit.zip")) {
-#         Remove-Item -Path "$DevKit.zip" -Recurse -Force
-#     }
-# }
-
 function Assert-ExitCode {
     [CmdletBinding()]
     param(
@@ -74,6 +33,7 @@ function Assert-ExitCode {
 
 $MCPU = "baseline"
 
+Write-Host -Object "Starting"
 $ZigLlvmLldClang = "zig+llvm+lld+clang-$Target-windows-gnu-$Build"
 $DevKit = "$Env:TEMP\$ZigLlvmLldClang"
 $Zig = "$DevKit/binzig.exe" -replace '\\', '/'
@@ -88,12 +48,14 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
+Write-Host -Object "Build Dir"
 $BuildDirectory = if ($Mode -eq "new") { "build" } else { "build-$Mode" }
 if (Test-Path -Path $BuildDirectory) {
     Remove-Item -Path $BuildDirectory -Recurse -Force
 }
 New-Item -Path $BuildDirectory -ItemType Directory
 
+Write-Host -Object "BUIld Project"
 $ArgList = if ($Mode -eq "new") {$(
     ".."
     "-GNinja"
