@@ -1,10 +1,15 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "ci")]
 param (
-    [Parameter(ParameterSetName="Stage3")]
-    [switch]$Stage3,
 
+    [Parameter(ParameterSetName = "ci")]
+    [switch]$CI,
+
+    [Parameter(ParameterSetName = "build")]
+    [switch]$Stage3,
+    
     [ValidateSet("release", "debug")]
     [string]$Mode = $(if ($Env:MODE) { $Env:MODE } else { "release" })
+
 )
 
 Set-StrictMode -Version 3.0
@@ -21,7 +26,7 @@ function Assert-ExitCode {
     exit 1
 }
 
-if (-not $Stage3.IsPresent) {
+if ($CI.IsPresent) {
     $Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\zig-global-cache"
     $Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\zig-local-cache"
 }
@@ -41,27 +46,40 @@ $Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
 $ZigKit = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
 
-Write-Host -Object "Getting Devkit..."
+Write-Host -Object "Wiping target directories..."
+switch ($PSCmdlet.ParameterSetName) {
+    "ci" {
+        if (Test-Path -Path "build-$Mode") { Remove-Item -Path "build-$Mode" -Recurse -Force }
+        New-Item -Path "build-$Mode" -ItemType Directory | Out-Null
+    }
+    "build" {
+        if (Test-Path -Path "build") { Remove-Item -Path "build" -Recurse -Force }
+        New-Item -Path "build" -ItemType Directory | Out-Null
+    }
+}
+
 if (!(Test-Path -Path "../$ZigKit.zip")) {
+    Write-Host -Object "Getting Devkit..."
     Invoke-WebRequest -Uri "https://ziglang.org/deps/$ZigKit.zip" -OutFile "../$ZigKit.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $ZipDir = (Resolve-Path -Path "../$ZigKit.zip/..").Path
-    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have seperate current directories
+    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path) # dotnet and ps have separate current directories
     [System.IO.Compression.ZipFile]::ExtractToDirectory("$ZipDir\$ZigKit.zip", "$ZipDir\$ZigKit\..")
 }
 
 $Zig = (Resolve-Path -Path "../$ZigKit/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigKit").Path -replace '\\', '/'
 
+Write-Host -Object "Running git commands..."
 git fetch --tags
-
 if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
-$Build = if ($Stage3.IsPresent) { "build" } else { "build-$Mode" }
-if (Test-Path -Path $Build) { Remove-Item -Path $Build -Recurse -Force }
-New-Item -Path $Build -ItemType Directory
+$InstallPrefix = $(if ($CI.IsPresent) { "stage3-$Mode" } else { "build" })
+| Resolve-Path
+| Select-Object -ExpandProperty Path
+| ForEach-Object -Process { $_ -replace '\\', '/' }
 
 $ArgList = $(
     ".."
@@ -72,29 +90,24 @@ $ArgList = $(
     "-DCMAKE_PREFIX_PATH=""$Prefix"""
     "-DCMAKE_BUILD_TYPE=$Mode"
     "-DCMAKE_AR=""$Zig"""
-) + $(
-    if ($Stage3.IsPresent) {
-        $(
-            "-DCMAKE_C_COMPILER=""$Zig;cc"""
-            "-DCMAKE_CXX_COMPILER=""$Zig;c++"""
-            "-DCMAKE_AR=""$Zig"""
-            "-DZIG_STATIC=ON"
-            "-DZIG_USE_LLVM_CONFIG=OFF"
-        )
-    }
-    else {
-        $(
-            "-DCMAKE_INSTALL_PREFIX=""stage3-$Mode"""
-            "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target-windows-gnu;-mcpu=$MCPU"""
-            "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target-windows-gnu;-mcpu=$MCPU"""
-            "-DZIG_TARGET_TRIPLE=""$Target-windows-gnu"""
-            "-DZIG_TARGET_MCPU=""$MCPU"""
-        )
-    }
+    "-DCMAKE_INSTALL_PREFIX=$InstallPrefix"
+    "-DCMAKE_C_COMPILER=""$Zig;cc;-target;$Target-windows-gnu;-mcpu=$MCPU"""
+    "-DCMAKE_CXX_COMPILER=""$Zig;c++;-target;$Target-windows-gnu;-mcpu=$MCPU"""
 )
+$ArgList += if ($CI.IsPresent) {
+    "-DZIG_STATIC=ON -DZIG_USE_LLVM_CONFIG=OFF" 
+}
+else {
+    "-DZIG_TARGET_TRIPLE=""$Target-windows-gnu"" -DZIG_TARGET_MCPU=""$MCPU""" 
+}
 
+$Build = if ($CI.IsPresent) { "stage3-$Mode" } else { "build" }
+
+Write-Host -Object "Running cmake"
 $Process = Start-Process -WorkingDirectory $Build -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
+
+Write-Host -Object "Running ninja"
 $Process = Start-Process -WorkingDirectory $Build -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
@@ -104,12 +117,11 @@ if ($Stage3.IsPresent) {
     return 0
 }
 
-<#
-Write-Output "Main test suite..."
-$Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassThru -Wait -ArgumentList $(
+Write-Host -Object "Main test suite..."
+$Process = Start-Process -FilePath "stage3-$Mode\bin\zig.exe" -NoNewWindow -PassThru -Wait -ArgumentList $(
     "build test docs"
-    "--zig-lib-dir ""$ZIG_LIB_DIR"""
-    "--search-prefix ""$PREFIX_PATH"""
+    "--zig-lib-dir ""$(Get-Location)\lib"""
+    "--search-prefix ""$Prefix"""
     "-Dstatic-llvm"
     "-Dskip-non-native"
     "-Denable-symlinks-windows"
@@ -120,10 +132,10 @@ $Process | Assert-ExitCode
 if ($Target -eq "aarch64") { return 0 }
 
 Write-Output "Build x86_64-windows-msvc behavior tests using the C backend..."
-$Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassThru -Wait -ArgumentList $(
+$Process = Start-Process -FilePath "stage3-$Mode\bin\zig.exe" -NoNewWindow -PassThru -Wait -ArgumentList $(
     "test"
     "..\test\behavior.zig"
-    "--zig-lib-dir ""$ZIG_LIB_DIR"""
+    "--zig-lib-dir ""$(Get-Location)\lib"""
     "-ofmt=c"
     "-femit-bin=""test-x86_64-windows-msvc.c"""
     "--test-no-exec"
@@ -132,9 +144,9 @@ $Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassTh
 )
 $Process | Assert-ExitCode
 
-$Process = Start-Process -FilePath stage3-$MODE\bin\zig.exe -NoNewWindow -PassThru -Wait -ArgumentList $(
+$Process = Start-Process -FilePath "stage3-$Mode\bin\zig.exe" -NoNewWindow -PassThru -Wait -ArgumentList $(
     "build-obj"
-    "--zig-lib-dir ""$ZIG_LIB_DIR"""
+    "--zig-lib-dir ""$(Get-Location)\lib"""
     "-ofmt=c "
     "-OReleaseSmall "
     "--name compiler_rt "

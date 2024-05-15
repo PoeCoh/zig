@@ -90,7 +90,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: ci/windows.ps1
+        run: ci/windows.ps1 -CI
   x86_64-windows-release:
     runs-on: [self-hosted, Windows, x86_64]
     env:
@@ -99,7 +99,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build and Test
-        run: ci/windows.ps1
+        run: ci/windows.ps1 -CI
   # aarch64-windows:
   #   runs-on: [self-hosted, Windows, aarch64]
   #   env:
@@ -108,4 +108,4 @@ jobs:
   #     - name: Checkout
   #       uses: actions/checkout@v4
   #     - name: Build and Test
-  #       run: ci/windows.ps1
+  #       run: ci/windows.ps1 -CI
