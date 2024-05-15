@@ -47,15 +47,13 @@ $ZigKit = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
 
 Write-Host -Object "Wiping target directories..."
-switch ($PSCmdlet.ParameterSetName) {
-    "ci" {
-        if (Test-Path -Path "build-$Mode") { Remove-Item -Path "build-$Mode" -Recurse -Force }
-        New-Item -Path "build-$Mode" -ItemType Directory | Out-Null
-    }
-    "build" {
-        if (Test-Path -Path "build") { Remove-Item -Path "build" -Recurse -Force }
-        New-Item -Path "build" -ItemType Directory | Out-Null
-    }
+if ($CI.IsPresent) {
+    if (Test-Path -Path "stage3-$Mode") { Remove-Item -Path "stage3-$Mode" -Recurse -Force }
+    New-Item -Path "stage3-$Mode" -ItemType Directory | Out-Null
+}
+else {
+    if (Test-Path -Path "build") { Remove-Item -Path "build" -Recurse -Force }
+    New-Item -Path "build" -ItemType Directory | Out-Null
 }
 
 if (!(Test-Path -Path "../$ZigKit.zip")) {
