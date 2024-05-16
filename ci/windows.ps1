@@ -38,23 +38,18 @@ $Target = switch ($Env:PROCESSOR_ARCHITECTURE) {
 }
 
 $Tarball = if ($Env:TARBALL) { $Env:TARBALL } else {
-    $Content = Get-Content .\.github\workflows\ci.yaml
+    Get-Content .\.github\workflows\ci.yaml
     | Select-String -Pattern "TARBALL: ""(.+)"""
-    $Content.Matches.Groups[1].Value
+    | ForEach-Object -Process { $_.Matches.Groups[1].Value }
 }
 
 $ZigKit = "zig+llvm+lld+clang-$Target-windows-gnu-$Tarball"
 $MCPU = "baseline"
 
 Write-Host -Object "Wiping target directories..."
-if ($CI.IsPresent) {
-    if (Test-Path -Path "stage3-$Mode") { Remove-Item -Path "stage3-$Mode" -Recurse -Force }
-    New-Item -Path "stage3-$Mode" -ItemType Directory | Out-Null
-}
-else {
-    if (Test-Path -Path "build") { Remove-Item -Path "build" -Recurse -Force }
-    New-Item -Path "build" -ItemType Directory | Out-Null
-}
+$Build = if ($CI.IsPresent) { "stage3-$Mode" } else { "stage3" }
+if (Test-Path -Path $Build) { Remove-Item -Path $Build -Recurse -Force }
+New-Item -Path $Build -ItemType Directory | Out-Null
 
 if (!(Test-Path -Path "../$ZigKit.zip")) {
     Write-Host -Object "Getting Devkit..."
@@ -68,16 +63,15 @@ if (!(Test-Path -Path "../$ZigKit.zip")) {
 $Zig = (Resolve-Path -Path "../$ZigKit/bin/zig.exe").Path -replace '\\', '/'
 $Prefix = (Resolve-Path -Path "../$ZigKit").Path -replace '\\', '/'
 
-Write-Host -Object "Running git commands..."
+Write-Host -Object "git fetch..."
 git fetch --tags
 if ((git rev-parse --is-shallow-repository) -eq "true") {
     git fetch --unshallow
 }
 
-$InstallPrefix = $(if ($CI.IsPresent) { "stage3-$Mode" } else { "build" })
+$InstallPrefix = $Build
 | Resolve-Path
-| Select-Object -ExpandProperty Path
-| ForEach-Object -Process { $_ -replace '\\', '/' }
+| ForEach-Object -Process { $_.Path -replace '\\', '/' }
 
 $ArgList = $(
     ".."
@@ -99,13 +93,11 @@ else {
     "-DZIG_TARGET_TRIPLE=""$Target-windows-gnu"" -DZIG_TARGET_MCPU=""$MCPU""" 
 }
 
-$Build = if ($CI.IsPresent) { "stage3-$Mode" } else { "build" }
-
-Write-Host -Object "Running cmake"
+Write-Host -Object "Running cmake..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath cmake -NoNewWindow -PassThru -Wait -ArgumentList $ArgList
 $Process | Assert-ExitCode
 
-Write-Host -Object "Running ninja"
+Write-Host -Object "Running ninja..."
 $Process = Start-Process -WorkingDirectory $Build -FilePath ninja -NoNewWindow -PassThru -Wait -ArgumentList install
 $Process | Assert-ExitCode
 
