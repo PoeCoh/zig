@@ -11,11 +11,15 @@ $Uri = $CiScript
 | Select-String -Pattern '\$ZIG_LLVM_CLANG_LLD_URL = "(.+)"'
 | ForEach-Object { $_.Matches.Groups[1].Value -replace '\$ZIG_LLVM_CLANG_LLD_NAME', $Tarball }
 
-Invoke-WebRequest -Uri $Uri -OutFile "../$Tarball.zip"
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::ExtractToDirectory("../$Tarball.zip", "../$Tarball")
-Remove-Item -Path "../$Tarball.zip" -Recurse -Force
-$Devkit = (Resolve-Path -Path "../$Tarball/$Tarball").Path
+if (-not (Test-Path -Path devkits)) { New-Item -Path devkits -ItemType Directory | Out-Null }
+
+if (-not (Test-Path -Path "devkits/$Tarball")) {
+    Invoke-WebRequest -Uri $Uri -OutFile "devkits/$Tarball.zip"
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("devkits/$Tarball.zip", "devkits/$Tarball/..")
+    Remove-Item -Path "../$Tarball.zip" -Recurse -Force
+}
+$Devkit = (Resolve-Path -Path "devits/$Tarball").Path
 
 if (Test-Path -Path stage3) { Remove-Item -Path stage3 -Recurse -Force }
 if (Test-Path -Path build) { Remove-Item -Path build -Recurse -Force }
