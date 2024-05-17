@@ -13,14 +13,14 @@ $Uri = $CiScript
 
 if (-not (Test-Path -Path devkits)) { New-Item -Path devkits -ItemType Directory | Out-Null }
 
-if (-not (Test-Path -Path "devkits/$Tarball")) {
-    Invoke-WebRequest -Uri $Uri -OutFile "devkits/$Tarball.zip"
+if (-not (Test-Path -Path "./devkits/$Tarball")) {
+    Invoke-WebRequest -Uri $Uri -OutFile "./devkits/$Tarball.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path)
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("devkits/$Tarball.zip", "devkits/$Tarball/..")
+    [System.IO.Compression.ZipFile]::ExtractToDirectory("./devkits/$Tarball.zip", "./devkits/$Tarball/..")
     Remove-Item -Path "../$Tarball.zip" -Recurse -Force
 }
-$Devkit = (Resolve-Path -Path "devits/$Tarball").Path
+$Devkit = (Resolve-Path -Path "./devits/$Tarball").Path
 
 if (Test-Path -Path stage3) { Remove-Item -Path stage3 -Recurse -Force }
 if (Test-Path -Path build) { Remove-Item -Path build -Recurse -Force }
