@@ -18,7 +18,7 @@ if (-not (Test-Path -Path "./devkits/$Tarball")) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path)
     [System.IO.Compression.ZipFile]::ExtractToDirectory("./devkits/$Tarball.zip", "./devkits/$Tarball/..")
-    Remove-Item -Path "../$Tarball.zip" -Recurse -Force
+    Remove-Item -Path "./devkits/$Tarball.zip" -Recurse -Force
 }
 $Devkit = (Resolve-Path -Path "./devkits/$Tarball").Path
 
