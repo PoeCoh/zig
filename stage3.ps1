@@ -16,6 +16,7 @@ if (-not (Test-Path -Path devkits)) { New-Item -Path devkits -ItemType Directory
 if (-not (Test-Path -Path "devkits/$Tarball")) {
     Invoke-WebRequest -Uri $Uri -OutFile "devkits/$Tarball.zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path)
     [System.IO.Compression.ZipFile]::ExtractToDirectory("devkits/$Tarball.zip", "devkits/$Tarball/..")
     Remove-Item -Path "../$Tarball.zip" -Recurse -Force
 }
