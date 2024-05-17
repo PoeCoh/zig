@@ -15,7 +15,7 @@ This switch is basically a replacement for the instructions on https://github.co
 Indicates this is for a CI run. For reasons there has to be a unique parameter for each parameter set so powershell knows which one to use.
 
 .PARAMETER Release
-Using this switch will build and test release. Ommitting this switch will build and test debug
+Must be used with -CI. Using this switch will build and test release. Ommitting this switch will build and test debug
 
 .EXAMPLE
 .\ci\windows.ps1 -Stage3
@@ -49,17 +49,17 @@ This comment block is visible in powershell using the Get-Help command, `Get-Hel
 #>
 [CmdletBinding()]
 param (
-    [Parameter(ParameterSetName = "stage3", Mandatory=$true)]
+    [Parameter(ParameterSetName = "stage3", Mandatory = $true)]
     [switch]$Stage3,
 
-    [Parameter(ParameterSetName = "CI", Mandatory=$true)]
+    [Parameter(ParameterSetName = "CI", Mandatory = $true)]
     [switch]$CI,
 
     [Parameter(ParameterSetName = "CI")]
     [switch]$Release
 
-    # Debug is a built in switch that works with Write-Debug. It would only
-    # have been used once so if -Release is not included it's a debug run.
+    # Didn't use Debug as it's a built in switch that works with Write-Debug. It would only have
+    # been used once so if -Release is not included it's a debug run.
 )
 
 # Will throw error if using unassigned variable
@@ -72,7 +72,10 @@ $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 if (-not $Env:ARCH) {
     $Env:ARCH = switch ($Env:PROCESSOR_ARCHITECTURE) {
         "AMD64" { "x86_64" } # not sure how many possible items there are
-        default { "aarch64" }
+        "IA64" { "x86_64" }
+        "ARM64" { "aarch64" }
+        "x86" { "x86" }
+        default { throw "unknown processor" }
     }
 }
 
@@ -92,28 +95,31 @@ $MCPU = "baseline"
 $ZIG_LLVM_CLANG_LLD_URL = "https://ziglang.org/deps/$ZIG_LLVM_CLANG_LLD_NAME.zip"
 
 $PREFIX_PATH = "$Env:USERPROFILE\zigkits\$ZIG_LLVM_CLANG_LLD_NAME"
-# $PREFIX_PATH = "$($Env:USERPROFILE)\$ZIG_LLVM_CLANG_LLD_NAME"
 $ZIG = "$PREFIX_PATH\bin\zig.exe" -Replace "\\", "/"
 $ZIG_LIB_DIR = "$(Get-Location)\lib"
 
-if (!(Test-Path -Path $PREFIX_PATH/..)) { New-Item -Path $PREFIX_PATH/.. -ItemType Directory | Out-Null }
-if (!(Test-Path "$PREFIX_PATH")) {
+if (!(Test-Path -Path $PREFIX_PATH/..)) {
+    New-Item -Path $PREFIX_PATH/.. -ItemType Directory
+    | Out-Null
+}
+if (!(Test-Path "$PREFIX_PATH" -Exclude "*.zip")) {
     # Clean up all old kits before downloading new one
-    Get-ChildItem -Path $PREFIX_PATH/.. | Remove-Item -Recurse -Force
+    Get-ChildItem -Path $PREFIX_PATH/..
+    | Remove-Item -Recurse -Force
+
     Write-Output "Downloading $ZIG_LLVM_CLANG_LLD_URL"
     Invoke-WebRequest -Uri "$ZIG_LLVM_CLANG_LLD_URL" -OutFile "$PREFIX_PATH.zip"
 
     Write-Output "Extracting..."
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path)
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("$PREFIX_PATH.zip", "$PREFIX_PATH\..")
+    Expand-Archive -Path "$PREFIX_PATH.zip" -DestinationPath "$PREFIX_PATH/.."
     Remove-Item -Path "$PREFIX_PATH.zip" -Recurse -Force
 }
 
 function Assert-Result {
     [CmdletBinding()]
     param (
-        [Parameter(ValueFromPipelineByPropertyName)]
+        # Captures value from piped items $_.ExitCode
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [int]$ExitCode,
 
         [Parameter()]
@@ -134,13 +140,13 @@ if ((git rev-parse --is-shallow-repository) -eq "true") {
 
 Write-Host -Object "Building from source..."
 Remove-Item -Path $WorkDir -Recurse -Force -ErrorAction Ignore
-New-Item -Path $WorkDir -ItemType Directory | Out-Null
+New-Item -Path $WorkDir -ItemType Directory
+| Out-Null
 # Set-Location -Path "build-$Mode"
 
 # Override the cache directories because they won't actually help other CI runs
 # which will be testing alternate versions of zig, and ultimately would just
 # fill up space on the hard drive for no reason.
-
 if ($CI.IsPresent) {
     $Env:ZIG_GLOBAL_CACHE_DIR = "$(Get-Location)\$WorkDir\zig-global-cache"
     $Env:ZIG_LOCAL_CACHE_DIR = "$(Get-Location)\$WorkDir\zig-local-cache"
@@ -156,7 +162,8 @@ $Splat = @{
     Wait             = $true
     NoNewWindow      = $true
 }
-$CMake = Start-Process -FilePath cmake -ArgumentList $(
+
+$ArgList = $(
     ".."
     "-GNinja"
     "-DCMAKE_INSTALL_PREFIX=""$InstallDir"""
@@ -170,9 +177,12 @@ $CMake = Start-Process -FilePath cmake -ArgumentList $(
     "-DCMAKE_AR=""$ZIG"""
     $(if (-not $Stage3.IsPresent) { "-DZIG_TARGET_TRIPLE=""$TARGET""" })
     $(if (-not $Stage3.IsPresent) { "-DZIG_TARGET_MCPU=""$MCPU""" })
-) @Splat
+)
+Write-Debug -Message "cmake $ArgList"
+$CMake = Start-Process -FilePath cmake -ArgumentList $ArgList  @Splat
 $CMake | Assert-Result -Failure "cmake"
 
+Write-Debug -Message "ninja install"
 $Ninja = Start-Process -FilePath ninja -ArgumentList install @Splat
 $Ninja | Assert-Result -Failure "ninja"
 
@@ -181,8 +191,8 @@ if ($Stage3.IsPresent) {
     Exit 0
 }
 
-Write-Host -Object "Main test suite..."
-$MainTest = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
+$ZigExe = "$WorkDir/stage3-$Mode/bin/zig.exe"
+$ArgList = $(
     "build test docs"
     "--zig-lib-dir ""$ZIG_LIB_DIR"""
     "--search-prefix ""$PREFIX_PATH"""
@@ -190,14 +200,16 @@ $MainTest = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
     "-Dskip-non-native"
     "-Denable-symlinks-windows"
     if (-not $Release.IsPresent) { "-Dskip-release" }
-) @Splat
+)
+Write-Host -Object "Main test suite..."
+Write-Debug -Message "$ZigExe $ArgList"
+$MainTest = Start-Process -FilePath $ZigExe -ArgumentList $ArgList @Splat
 $MainTest | Assert-Result -Failure "Main Tests"
 
 # arm stopped here
 if ($Env:ARCH -eq "aarch64") { exit 0 }
 
-Write-Output "Build x86_64-windows-msvc behavior tests using the C backend..."
-$CTest = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
+$ArgList = $(
     "test"
     "..\test\behavior.zig"
     "--zig-lib-dir ""$ZIG_LIB_DIR"""
@@ -206,10 +218,13 @@ $CTest = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
     "--test-no-exec"
     "-target x86_64-windows-msvc"
     "-lc"
-) @Splat
+)
+Write-Output "Build x86_64-windows-msvc behavior tests using the C backend..."
+Write-Debug -Message "$ZigExe $ArgList"
+$CTest = Start-Process -FilePath $ZigExe -ArgumentList $ArgList @Splat
 $CTest | Assert-Result -Failure "Testing C backend"
 
-$BuildObj = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
+$ArgList = $(
     "build-obj"
     "--zig-lib-dir ""$ZIG_LIB_DIR"""
     "-ofmt=c"
@@ -220,7 +235,9 @@ $BuildObj = Start-Process -FilePath "stage3-$Mode/bin/zig.exe" -ArgumentList $(
     "-target x86_64-windows-msvc"
     "--mod root ..\lib\compiler_rt.zig"
     "--mod build_options config.zig"
-) @Splat
+)
+Write-Debug -Message "$Zigexe $ArgList"
+$BuildObj = Start-Process -FilePath $ZigExe -ArgumentList $ArgList @Splat
 $BuildObj | Assert-Result -Failure "build-obj"
 
 # Haven't tested below this because I don't feel like waiting hours for this to download again
@@ -235,8 +252,7 @@ $VsSplat = @{
 Enter-VsDevShell @VsSplat
 Assert-Result -ExitCode $? -Failure "BuildTools"
 
-Write-Host "Build and run behavior tests with msvc..."
-$Cl = Start-Process -FilePath cl.exe -ArgumentList $(
+$ArgList = $(
     "-I..\lib"
     "test-x86_64-windows-msvc.c"
     "compiler_rt-x86_64-windows-msvc.c"
@@ -249,8 +265,12 @@ $Cl = Start-Process -FilePath cl.exe -ArgumentList $(
     "kernel32.lib"
     "ntdll.lib"
     "libcmt.lib"
-) @Splat
+)
+Write-Host "Build and run behavior tests with msvc..."
+Write-Debug -Message "$WorkDir/cl.exe $ArgList"
+$Cl = Start-Process -FilePath $WorkDir/cl.exe -ArgumentList $ArgList @Splat
 $Cl | Assert-Result -Failure "cl"
 
-$LastTest = Start-Process -FilePath ./test-x86_64-windows-msvc.exe @Splat
+Write-Debug -Message "$WorkDir/test-x86_64-windows-msvc.exe"
+$LastTest = Start-Process -FilePath $WorkDir/test-x86_64-windows-msvc.exe @Splat
 $LastTest | Assert-Result -Failure "test-x86_64-windows-msvc"
