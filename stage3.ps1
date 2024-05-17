@@ -1,6 +1,11 @@
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
+git fetch --tags
+if ((git rev-parse --is-shallow-repository) -eq "true") {
+    git fetch --unshallow
+}
+
 $CiScript = Get-Content -Path .\ci\x86_64-windows-release.ps1
 
 $Tarball = $CiScript
