@@ -20,7 +20,7 @@ if (-not (Test-Path -Path "./devkits/$Tarball")) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory("./devkits/$Tarball.zip", "./devkits/$Tarball/..")
     Remove-Item -Path "../$Tarball.zip" -Recurse -Force
 }
-$Devkit = (Resolve-Path -Path "./devits/$Tarball").Path
+$Devkit = (Resolve-Path -Path "./devkits/$Tarball").Path
 
 if (Test-Path -Path stage3) { Remove-Item -Path stage3 -Recurse -Force }
 if (Test-Path -Path build) { Remove-Item -Path build -Recurse -Force }
