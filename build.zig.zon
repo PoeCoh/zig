@@ -1,0 +1,11 @@
+.{
+    .name = "simple_exe",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.13.0-dev.211+6a65561e3",
+
+    .dependencies = .{},
+
+    .paths = .{
+        "",
+    },
+}
