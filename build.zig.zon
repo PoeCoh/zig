@@ -1,0 +1,16 @@
+.{
+    .name = "simple_exe",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.13.0-dev.211+6a65561e3",
+
+    .dependencies = .{
+        .simple_lib = .{
+            .url = "https://github.com/PoeCoh/simple_lib/archive/512b7511264af98dd8d09161332024b30e8b328b.tar.gz",
+            .hash = "122065ac66683abeac67105fa390b9134c0a9b7262e31710e2bf7e9dc254b7e19170",
+        },
+    },
+
+    .paths = .{
+        "",
+    },
+}
