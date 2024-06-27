@@ -20,9 +20,7 @@ if (-not (Test-Path -Path devkits)) { New-Item -Path devkits -ItemType Directory
 
 if (-not (Test-Path -Path "./devkits/$Tarball")) {
     Invoke-WebRequest -Uri $Uri -OutFile "./devkits/$Tarball.zip"
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Directory]::SetCurrentDirectory($(Get-Location).Path)
-    [System.IO.Compression.ZipFile]::ExtractToDirectory("./devkits/$Tarball.zip", "./devkits/$Tarball/..")
+    Expand-Archive -Path "./devkits/$Tarball.zip" -DestinationPath "./devkits/$Tarball/.."
     Remove-Item -Path "./devkits/$Tarball.zip" -Recurse -Force
 }
 $Devkit = (Resolve-Path -Path "./devkits/$Tarball").Path
