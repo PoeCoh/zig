@@ -9,6 +9,8 @@ concurrency:
   # Cancels pending runs when a PR gets updated.
   group: ${{ github.head_ref || github.run_id }}-${{ github.actor }}
   cancel-in-progress: true
+env:
+  TARBALL: 0.14.0-dev.418+ebd9efa85
 jobs:
   x86_64-linux-debug:
     timeout-minutes: 420
